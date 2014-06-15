@@ -4,10 +4,9 @@ import numpy.ma as ma
 from numpy import linalg as LA
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 import h5py
 import itertools
-import collections
+from collections import MutableSequence
 import cv2
 import wormtracker.wormimageprocessor as wip
 import multiprocessing as multi
@@ -37,7 +36,7 @@ def pairwise(iterable):
 
 
 class WormTrajectory:
-    filterByWidth = False
+    filterByWidth = False  # static variable!
 
     def __init__(self, h5obj, strain, wormID, videoFilePath=None):
         self.firstFrame = None
@@ -296,126 +295,22 @@ class WormTrajectory:
             plt.show()
 
 
-class WormTrajectoryEnsemble:
-    def __init__(self, trajectoryIter=None, name=None, nameFunc=None):
-        if any(not isinstance(it, WormTrajectory) for it in trajectoryIter):
-            raise TypeError('A trajectory ensemble must contain ' +
-                            'WormTrajectory objects.')
-        self._trajectories = list(trajectoryIter)
+class WormTrajectoryEnsemble(MutableSequence):
+    def __init__(self, trajectoryIter, name=None, nameFunc=None):
+        MutableSequence.__init__(self, trajectoryIter)
         self.name = name
         if nameFunc is None:
             nameFunc = lambda t: t.strain + ' ' + t.wormID
         self.nameFunc = nameFunc
 
-    def __iter__(self):
-        for traj in self._trajectories:
-            yield traj
-
-    #  TODO: Implement
-    #  __add__(), __radd__(), __iadd__(), __mul__(), __rmul__() and __imul__()
-
-    def __add__(self, other):
-        if isinstance(other, WormTrajectory):
-            return WormTrajectoryEnsemble(self + other)
-        elif isinstance(other, WormTrajectoryEnsemble):
-            return WormTrajectoryEnsemble(self + other._trajectories)
-        elif (isinstance(other, collections.Iterable) and
-              all([isinstance(t, WormTrajectoryEnsemble)
-                   for t in other])):
-            return WormTrajectoryEnsemble(self + other)
-        else:
-            raise ValueError('{0} is not a valid'.format(str(type(other))) +
-                             ' type to add to a WormTrajectoryEnsemble')
-
-    def __radd__(self, other):
-        return self.__add__(other)
-
-    def __iadd__(self, other):
-        if isinstance(other, WormTrajectory):
-            self.append(other)
-        elif isinstance(other, WormTrajectoryEnsemble):
-            return self.extend(other._trajectories)
-        elif (isinstance(other, collections.Iterable) and
-              all([isinstance(t, WormTrajectory)
-                   for t in other])):
-            return self.extend(other)
-        else:
-            raise ValueError('{0} is not a valid'.format(str(type(other))) +
-                             ' type to add to a WormTrajectoryEnsemble')
-
-    def __isub__(self, other):
-        if isinstance(other, WormTrajectory):
-            self.remove(other)
-        elif isinstance(other, WormTrajectoryEnsemble):
-            for t in other:
-                self.remove(t)
-        elif (isinstance(other, collections.Iterable) and
-              all([isinstance(t, WormTrajectory)
-                   for t in other])):
-            for t in other:
-                self.remove(t)
-        else:
-            raise ValueError('{0} is not a valid'.format(str(type(other))) +
-                             ' type to remove from a WormTrajectoryEnsemble')
-
-    def __eq__(self, other):
-        return all([(traj in other) for traj in self])
-
-    def __ne__(self, other):
-        return any([(traj not in other) for traj in self])
-
-    def __getitem__(self, key):
-        return self._trajectories[key]
-
-    def __setitem__(self, key, value):
-        self._trajectories[key] = value
-
-    def __delitem__(self, key):
-        del self._trajectories[key]
-
-    def __contains__(self, value):
-        return value in self._trajectories
-
-    def __len__(self):
-        return len(self._trajectories)
-
-    def __getslice__(self, i, j):
-        return WormTrajectoryEnsemble(self._trajectories[i:j])
-
-    def __setslice__(self, i, j, sequence):
-        self._trajectories[i:j] = sequence
-
-    def __delslice__(self, i, j):
-        del self._trajectories[i:j]
-
-    def append(self, item):
-        self._trajectories.append(item)
-
-    def count(self):
-        return self._trajectories.count()
-
-    def index(self, value):
-        return self._trajectories.index(value)
-
-    def extend(self, iter):
-        self._trajectories.extend(iter)
-
-    def insert(self, index, item):
-        self._trajectories.insert(index, item)
-
-    def pop(self, index):
-        self._trajectories.pop([index])
-
-    def remove(self, item):
-        self._trajectories.remove(item)
-
-    def reverse(self):
-        self._trajectories.reverse()
+    def _from_iterable(self, iter):
+        return WormTrajectoryEnsemble(iter, name=self.name,
+                                      nameFunc=self.nameFunc)
 
     def sort(self, cmp=None, key=None):
         if cmp is None and key is None:
             key = lambda t: int(t.wormID)
-        self._trajectories.sort(cmp=cmp, key=key)
+        MutableSequence.sort(self, cmp=cmp, key=key)
 
     def splitByStrain(self):
         strains = set([traj.strain for traj in self])
@@ -435,7 +330,7 @@ class WormTrajectoryEnsemble:
             if np.all(missing):
                 continue
             else:
-                posture.append(posturea[~missing, :])   
+                posture.append(posturea[~missing, :])
         if len(posture) > 0:
             posture = np.concatenate(posture).T
             self.Ctheta = np.cov(posture)
@@ -594,79 +489,23 @@ class WormTrajectoryEnsemble:
             plt.show()
 
 
-class WormTrajectoryEnsembleGroup(object):
+class WormTrajectoryEnsembleGroup(MutableSequence):
     def __init__(self, ensembles, name=None, colorScheme=None):
-        if any(not isinstance(it, WormTrajectoryEnsemble)
-               for it in ensembles):
-            raise TypeError('A trajectory ensemble group must contain ' +
-                            'WormTrajectoryEnsemble objects.')
-        self._ensembles = list(ensembles)
+        MutableSequence.__init__(self, ensembles)
         self.name = name
         if colorScheme is None:
             self.colorScheme = lambda e: 'k'
         else:
             self.colorScheme = colorScheme
 
-    def __iter__(self):
-        for ens in self._ensembles:
-            yield ens
-
-    #  TODO: Implement
-    #  __add__(), __radd__(), __iadd__(), __mul__(), __rmul__() and __imul__()
-
-    def __getitem__(self, key):
-        return self._ensembles[key]
-
-    def __setitem__(self, key, value):
-        self._ensembles[key] = value
-
-    def __delitem__(self, key):
-        del self._ensembles[key]
-
-    def __contains__(self, value):
-        return value in self._ensembles
-
-    def __len__(self):
-        return len(self._ensembles)
-
-    def __getslice__(self, i, j):
-        return WormTrajectoryEnsembleGroup(self._ensembles[i:j],
-                                           name=self.name)
-
-    def __setslice__(self, i, j, sequence):
-        self._ensembles[i:j] = sequence
-
-    def __delslice__(self, i, j):
-        del self._ensembles[i:j]
-
-    def append(self, item):
-        self._ensembles.append(item)
-
-    def count(self):
-        return self._ensembles.count()
-
-    def index(self, value):
-        return self._ensembles.index(value)
-
-    def extend(self, iter):
-        self._ensembles.extend(iter)
-
-    def insert(self, index, item):
-        self._ensembles.insert(index, item)
-
-    def pop(self, index):
-        self._ensembles.pop([index])
-
-    def remove(self, item):
-        self._ensembles.remove(item)
-
-    def reverse(self):
-        self._ensembles.reverse()
+    def _from_iterable(self, iter):
+        return WormTrajectoryEnsembleGroup(iter, name=self.name,
+                                           colorScheme=self.colorScheme)
 
     def sort(self, cmp=None, key=None):
         if cmp is None and key is None:
             key = lambda e: e.name
-        self._ensembles.sort(cmp=cmp, key=key)
+        MutableSequence.sort(self, cmp=cmp, key=key)
 
     def calculatePosturalMeasurements(self):
         for ens in self:
