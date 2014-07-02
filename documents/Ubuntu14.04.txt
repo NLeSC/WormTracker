@@ -1,0 +1,35 @@
+###
+#
+# Software install instructions for Ubuntu 14.04 
+#
+# Most software can be installed through apt-get or pip install.. 
+# 
+
+# python+etc. 
+
+sudo apt-get install python python-dev 
+
+# python pip 
+
+sudo apt-get install python-pip 
+
+###
+### modules 
+###
+ 
+# pip: 
+sudo pip install scikit-image
+sudo pip install scipy numpy
+
+# or apt-get: 
+sudo apt-get install python-scipy python-numpy
+
+#hdf5
+sudo apt-get install hdf5-tools libhdf5-dev python-h5py
+
+# OpenCV. Default version is 2.4: 
+sudo apt-get install python-opencv
+
+
+ 
+
