@@ -341,6 +341,7 @@ class WormVideoRegion:
 
     def process(self):
         """ Processes the video region. """
+        self.saveConfiguration()
         video = cv2.VideoCapture()
         ii = 0  # frame counter
         if video.open(self.videoFile):
@@ -395,8 +396,8 @@ class WormVideoRegion:
                 worm.store(self.resultsStoreFile,
                            pre, idx)
             except(Exception) as e:
-                Logger.logPrint('Error in {0} {1} frame {2} analyzing worm.'.format(
-                    self.strainName, self.wormName, str(idx)))
+                Logger.logPrint('Error in {0} {1} frame {2} analyzing worm: {3}'.format(
+                    self.strainName, self.wormName, str(idx), str(e)))
 
     def measureWorm(self, grayFrame, bwFrame, wormContour):
         worm = WormImage(self, grayFrame, bwFrame, wormContour)
@@ -430,28 +431,30 @@ class WormVideoRegion:
                 g.create_dataset('boundingBox', (n, 4), dtype='int32')
                 g.create_dataset('bwWormImage', (n, 150, 150),
                                  maxshape=(n, None, None),
-                                 chunks=True,
+                                 chunks=(1,19,19),
                                  compression='gzip', dtype='b')
                 g.create_dataset('grayWormImage', (n, 150, 150),
                                  maxshape=(n, None, None),
-                                 chunks=True,
+                                 chunks=(1,19,19),
                                  compression='gzip', dtype='uint8')
                 g.create_dataset('skeleton', (n, 50, 2),
                                  maxshape=(n, 200, 2),
-                                 chunks=True, dtype='int32')
+                                 chunks=(1,50,2), dtype='int32')
                 g.create_dataset('skeletonSpline',
                                  (n, self.imageProcessor.numberOfPosturePoints, 2),
                                  maxshape=(n, 100, 2),
-                                 chunks=True, dtype='float64')
+                                 chunks=(1,10,2), dtype='float64')
                 g.create_dataset('centroid', (n, 2), dtype='float64')
                 g.create_dataset('midpoint', (n, 2), dtype='float64')
                 g.create_dataset('width', (n,), dtype='float64')
                 g.create_dataset('length', (n,), dtype='float64')
                 g.create_dataset('meanBodyAngle', (n,), dtype='float64')
                 g.create_dataset('posture', (n, self.imageProcessor.numberOfPosturePoints),
-                                 maxshape=(n, 100), dtype='float64')
+                                 maxshape=(n, 100),
+                                 chunks=(1, 10), dtype='float64')
                 g.create_dataset('wormContour', (n, 2, 1, 2),
-                                 maxshape=(n, None, 1, 2), chunks=True,
+                                 maxshape=(n, None, 1, 2),
+                                 chunks=(1, 10, 1, 2),
                                  fillvalue=-1,
                                  dtype='int32')
                 g.create_dataset('time', (n,), dtype='float64')
@@ -511,7 +514,7 @@ class WormImage:
         self.outlinedWormImage = np.zeros(self.bwWormImage.shape,
                                           dtype=np.uint8)
         cv2.drawContours(self.outlinedWormImage,
-                         [self.toCroppedCoordinates(self.wormContour)],
+                         [self.toCroppedCoordinates(self.wormContour).astype('int')],
                          0, 255, thickness=1)
         self.outlinedWormImage = np.equal(self.outlinedWormImage, 255)
 
@@ -549,8 +552,8 @@ class WormImage:
     def calculateCentroid(self):
         moments = cv2.moments(self.wormContour)
         if moments['m00'] != 0:  # only calculate if there is a non-zero area
-            cx = moments['m10']/moments['m00']  # cx = M10/M00
-            cy = moments['m01']/moments['m00']
+            cx = float(moments['m10'])/float(moments['m00'])  # cx = M10/M00
+            cy = float(moments['m01'])/float(moments['m00'])
             self.centroid = self.toRegionCoordinates( \
                 np.flipud(self.toCroppedCoordinates([cx, cy])))
         else:
@@ -605,12 +608,12 @@ class WormImage:
     def toCroppedCoordinates(self, pts):
         if self.boundingBox is None:
             self.cropToWorm()
-        return pts - np.array(self.boundingBox[0:2])
+        return pts - np.array(self.boundingBox[0:2], 'f8')
 
     def toRegionCoordinates(self, pts):
         if self.boundingBox is None:
             self.cropToWorm()  # crop the frame to the worm
-        return pts + np.array(self.boundingBox[0:2])
+        return pts + np.array(self.boundingBox[0:2], 'f8')
 
     def store(self, storeFile, storePath, index):
         if os.path.isfile(storeFile):
