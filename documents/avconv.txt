@@ -1,0 +1,38 @@
+##
+# avconv/ffmpeg notes 
+#
+
+sudo apt-get install libav-tools 
+
+###
+###  avconv commands 
+###
+
+- Split video, starting at 00:00:30 with a time of 10 seconds:
+
+     avconv -i worms_cam69.avi  -ss  00:00:30 -t 00:00:10  worms_cam69.00:30:00_00:10:00.mp4
+
+
+- Lossless(!) compression using x264 to gray: 
+
+     avconv -i worms_cam69.avi  -ss  00:03:00 -t 00:01:00  worms_snap_00:3:00-00:01:00.mp4
+
+
+- Lossy compression using x264 to YUV444p, resulting video is 100x(!) smaller:
+
+    avconv -i worms_snap.avi -c:v libx264 -pix_fmt yuv410p  worms_out.x264.yuv410.mp4
+
+
+- Lossless(!) compression using x264 to YUV444p (equal luminance and chrominance) (-crf 0 is lossless. ), resulting video is 10x smaller:
+
+    avconv -i worms_snap.avi -c:v libx264 -pix_fmt yuv444p -crf 0 worms_out.x264.yuv444.losless.mp4
+
+
+- Lossless(!) compression using x264 to YUV410p (more luminance, less chrominance information)
+
+     avconv -i worms_snap.avi -c:v libx264 -pix_fmt yuv410p -crf 0 worms_out.x264.yuv410.losless.mp4
+
+
+
+
+
