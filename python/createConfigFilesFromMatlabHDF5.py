@@ -7,19 +7,35 @@ prefix = 'sdsbox'
 with h5py.File(dataset, 'r') as f:
     strains = f.keys()
     for strain in strains:
-        videos = dataset[strain]['videos'].keys()
+        videos = f[strain]['videos'].keys()
         for video in videos:
             configName = '{0}_{1}_{2}.yml'.format(prefix, strain, video)
             with open(configName, 'w') as cf:
-                vd = dataset[strain]['videos'][video]
-                expWormLength = vd['expected_worm_length'][...]
-                expWormWidth = vd['expected_worm_width'][...]
-                pixelsPerMicron = vd['pixels_per_um'][...]
-                threshold = vd['threshold'][...]
-                videoFile = vd.attr['FileName']
+                vd = f[strain]['videos'][video]
+                expWormLength = float(vd['expected_worm_length'][0])
+                expWormWidth = float(vd['expected_worm_width'][0])
+                pixelsPerMicron = float(vd['pixels_per_um'][0])
+                threshold = float(vd['threshold'][0])
+                videoFile = str(vd.attrs['FileName'])
+                wormDiskRadius = round(expWormWidth*pixelsPerMicron/2.)
                 config = {
                     'systemSettings': {
-                        'hdf5path': 'C:\hdf5'
+                        'hdf5path': 'C:\\hdf5'
+                    },
+                    'processingSettings': {
+                        'smoothing': 0.05
+                    },
+                    'postprocessingSettings': {
+                        'filterByWidth': True,
+                        'filterByLength': True,
+                        'widthThreshold': (0.5, 1.5),
+                        'lengthThreshold': (0.8, 1.2),
+                        'max_n_missing': 10,
+                        'max_d_um': 10.,
+                        'allowedSegmentSize': (150, 500),
+                        'headMinSpeed': 40.,
+                        'headMinLeading': 2,
+                        'headMinRelSpeed': 1.2
                     },
                     'videos': [{
                         'regions': [],
@@ -35,19 +51,19 @@ with h5py.File(dataset, 'r') as f:
                                                                  strain,
                                                                  video),
                             'videoFile': videoFile,
-                            'wormAreaThresholdRange': [0.5, 1.5],
-                            'wormDiskRadius': 2
+                            'wormAreaThresholdRange': (0.5, 1.5),
+                            'wormDiskRadius': wormDiskRadius
                         }
                     }]
                 }
-                td = dataset[strain]['trajectories']
+                td = f[strain]['trajectories']
                 worms = [w for w in td.keys()
-                         if int(td[w]['video']['video_id'][...]) == int(video)]
+                         if int(td[w]['video']['video_id'][0]) == int(video)]
                 for w in worms:
-                    crop = tuple(td[w]['video']['crop_region'][...].astype('i8'))
+                    crop = tuple(int(i) for i in td[w]['video']['crop_region'][...].astype('i8'))
                     config['videos'][0]['regions'].append({
                             'cropRegion': crop,
-                            'strainName': strain,
-                            'wormName': w
+                            'strainName': str(strain),
+                            'wormName': str(w)
                         })
                 yaml.dump(config, cf)
