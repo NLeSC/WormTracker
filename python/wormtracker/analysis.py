@@ -12,6 +12,7 @@ import collections
 import cv2
 import wormtracker.wormimageprocessor as wip
 import multiprocessing as multi
+from multiprocessing.pool import ThreadPool
 #from numba import jit
 import scipy.stats as ss
 from tsstats import *
@@ -744,7 +745,8 @@ class WormTrajectoryEnsemble:
             self.vtheta = None
 
     def ensembleAverage(self, compFunc, nSamples=1000):
-        samples = np.array([compFunc(traj) for traj in self])
+        pool = ThreadPool()
+        samples = np.array(pool.map(compFunc, self))
         return bootstrap(samples, nSamples)
 
     def tilePlots(self, plotFunc, ni=4, nj=4):
